@@ -28,9 +28,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   void _addPlayer() {
     setState(() {
-      _controllers.add(
-        _createController('Spelare ${_controllers.length + 1}'),
-      );
+      _controllers.add(_createController('Spelare ${_controllers.length + 1}'));
     });
     _savePlayers();
   }
@@ -80,36 +78,57 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final theme = Theme.of(context);
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Inställningar'),
-      ),
+      appBar: AppBar(title: const Text('Inställningar')),
       body: SafeArea(
         child: _isLoading
             ? const Center(child: CircularProgressIndicator())
-            : ListView(
+            : Padding(
                 padding: const EdgeInsets.all(24),
-                children: [
-                  Text(
-                    'Spelare',
-                    style: theme.textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.w600,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(
+                      'Spelare',
+                      style: theme.textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 12),
-                  for (var index = 0; index < _controllers.length; index++)
-                    _PlayerField(
-                      controller: _controllers[index],
-                      label: 'Spelare ${index + 1}',
-                      canRemove: _controllers.length > 2,
-                      onRemove: () => _removePlayer(index),
+                    const SizedBox(height: 12),
+                    Expanded(
+                      child: ReorderableListView.builder(
+                        padding: EdgeInsets.only(top: 10, bottom: 10),
+                        buildDefaultDragHandles: false,
+                        itemCount: _controllers.length,
+                        onReorder: (oldIndex, newIndex) {
+                          setState(() {
+                            if (newIndex > oldIndex) {
+                              newIndex -= 1;
+                            }
+                            final controller = _controllers.removeAt(oldIndex);
+                            _controllers.insert(newIndex, controller);
+                          });
+                          _savePlayers();
+                        },
+                        itemBuilder: (context, index) {
+                          return _PlayerField(
+                            key: ValueKey(_controllers[index]),
+                            index: index,
+                            controller: _controllers[index],
+                            label: 'Spelare ${index + 1}',
+                            canRemove: _controllers.length > 2,
+                            onRemove: () => _removePlayer(index),
+                          );
+                        },
+                      ),
                     ),
-                  const SizedBox(height: 4),
-                  OutlinedButton.icon(
-                    onPressed: _addPlayer,
-                    icon: const Icon(Icons.add),
-                    label: const Text('Lägg till spelare'),
-                  ),
-                ],
+                    const SizedBox(height: 8),
+                    OutlinedButton.icon(
+                      onPressed: _addPlayer,
+                      icon: const Icon(Icons.add),
+                      label: const Text('Lägg till spelare'),
+                    ),
+                  ],
+                ),
               ),
       ),
     );
@@ -118,12 +137,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
 class _PlayerField extends StatelessWidget {
   const _PlayerField({
+    super.key,
+    required this.index,
     required this.controller,
     required this.label,
     required this.canRemove,
     required this.onRemove,
   });
 
+  final int index;
   final TextEditingController controller;
   final String label;
   final bool canRemove;
@@ -131,10 +153,9 @@ class _PlayerField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Card(
         child: Row(
           children: [
             Expanded(
@@ -147,7 +168,21 @@ class _PlayerField extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 12),
+            Tooltip(
+              message: 'Dra för att ändra ordning',
+              child: ReorderableDragStartListener(
+                index: index,
+                child: MouseRegion(
+                  cursor: SystemMouseCursors.grab,
+                  child: const Padding(
+                    padding: EdgeInsets.all(8),
+                    child: Icon(Icons.drag_handle),
+                  ),
+                ),
+              ),
+            ),
             IconButton(
+              tooltip: 'Ta bort spelare',
               onPressed: canRemove ? onRemove : null,
               icon: const Icon(Icons.close),
             ),
