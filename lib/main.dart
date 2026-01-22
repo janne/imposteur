@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'ui/settings_screen.dart';
+
 void main() {
   runApp(const MyApp());
 }
@@ -112,7 +114,13 @@ class MyHomePage extends StatelessWidget {
                         width: double.infinity,
                         height: 48,
                         child: OutlinedButton(
-                          onPressed: () {},
+                          onPressed: () {
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (context) => const SettingsScreen(),
+                              ),
+                            );
+                          },
                           child: const Text('Inställningar'),
                         ),
                       ),
