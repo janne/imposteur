@@ -13,11 +13,24 @@ class MyApp extends StatelessWidget {
   // This widget is the root of your application.
   @override
   Widget build(BuildContext context) {
+    final colorScheme =
+        ColorScheme.fromSeed(
+          seedColor: const Color(0xFF4C8DFF),
+          brightness: Brightness.dark,
+        ).copyWith(
+          surface: const Color(0xFF0B1424),
+          surfaceContainerHighest: const Color(0xFF1B2D4A),
+          onSurface: const Color(0xFFF7F9FF),
+          onSurfaceVariant: const Color(0xFFB9C7E6),
+          outlineVariant: const Color(0xFF3A5580),
+        );
+
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'Imposteur',
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF1F6F5C)),
+        colorScheme: colorScheme,
+        scaffoldBackgroundColor: const Color(0xFF05070D),
       ),
       home: const MyHomePage(title: 'Imposteur'),
     );

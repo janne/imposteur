@@ -215,26 +215,40 @@ class _RevealScreenState extends State<RevealScreen> {
   Widget _buildRevealCard(ThemeData theme) {
     final playerName = _players[_currentIndex];
     final isImpostor = _currentIndex == _impostorIndex;
-    final front = _cardFace(
-      theme,
-      title: playerName,
-      subtitle: 'Spelare ${_currentIndex + 1}',
-      icon: Icons.person_rounded,
-    );
     final back = _cardFace(
       theme,
       title: isImpostor ? 'Du är förrädaren' : _word,
       subtitle: _category ?? 'Kategori',
       icon: isImpostor ? Icons.visibility_off_rounded : Icons.auto_awesome,
       emphasize: true,
+      backgroundColor: Colors.white,
+      backgroundGradient: null,
+      borderColor: null,
+      titleColor: const Color(0xFF0B1424),
+      subtitleColor: const Color(0xFF20324D),
+      iconColor: const Color(0xFF0B1424),
     );
 
     return AspectRatio(
       aspectRatio: 2.5 / 3.5,
-      child: _HoldToRevealCard(
-        key: ValueKey('reveal-$_roundId-$_currentIndex'),
-        front: front,
-        back: back,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final borderWidth = constraints.maxWidth * 0.05;
+          final front = _cardFace(
+            theme,
+            title: playerName,
+            subtitle: 'Spelare ${_currentIndex + 1}',
+            icon: Icons.person_rounded,
+            borderColor: Colors.white.withValues(alpha: 0.9),
+            borderWidth: borderWidth,
+          );
+
+          return _HoldToRevealCard(
+            key: ValueKey('reveal-$_roundId-$_currentIndex'),
+            front: front,
+            back: back,
+          );
+        },
       ),
     );
   }
@@ -278,46 +292,66 @@ class _RevealScreenState extends State<RevealScreen> {
     required String subtitle,
     required IconData icon,
     bool emphasize = false,
+    Color? backgroundColor,
+    Gradient? backgroundGradient,
+    Color? borderColor,
+    double? borderWidth,
+    Color? titleColor,
+    Color? subtitleColor,
+    Color? iconColor,
+    List<BoxShadow>? boxShadow,
   }) {
-    final titleStyle = emphasize
-        ? theme.textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.w700)
-        : theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700);
+    final baseTitleStyle = emphasize
+        ? theme.textTheme.headlineMedium
+        : theme.textTheme.headlineSmall;
+    final titleStyle = baseTitleStyle?.copyWith(
+      fontWeight: FontWeight.w700,
+      color: titleColor,
+    );
+    final fallbackGradient = LinearGradient(
+      colors: [
+        theme.colorScheme.surface,
+        theme.colorScheme.surfaceContainerHighest,
+      ],
+      begin: Alignment.topLeft,
+      end: Alignment.bottomRight,
+    );
+    final resolvedGradient =
+        backgroundGradient ??
+        (backgroundColor == null ? fallbackGradient : null);
+    final subtitleStyle = theme.textTheme.titleMedium?.copyWith(
+      color: subtitleColor ?? theme.colorScheme.onSurfaceVariant,
+    );
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 28),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(28),
-        gradient: LinearGradient(
-          colors: [
-            theme.colorScheme.surface,
-            theme.colorScheme.surfaceContainerHighest,
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        border: Border.all(color: theme.colorScheme.outlineVariant, width: 1.2),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.12),
-            blurRadius: 24,
-            offset: const Offset(0, 12),
-          ),
-        ],
+        color: resolvedGradient == null
+            ? (backgroundColor ?? theme.colorScheme.surface)
+            : null,
+        gradient: resolvedGradient,
+        border: borderColor == null
+            ? null
+            : Border.all(color: borderColor, width: borderWidth ?? 1.2),
+        boxShadow:
+            boxShadow ??
+            [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.12),
+                blurRadius: 24,
+                offset: const Offset(0, 12),
+              ),
+            ],
       ),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(icon, size: 48, color: theme.colorScheme.primary),
+          Icon(icon, size: 48, color: iconColor ?? theme.colorScheme.primary),
           const SizedBox(height: 16),
           Text(title, textAlign: TextAlign.center, style: titleStyle),
           const SizedBox(height: 8),
-          Text(
-            subtitle,
-            textAlign: TextAlign.center,
-            style: theme.textTheme.titleMedium?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-          ),
+          Text(subtitle, textAlign: TextAlign.center, style: subtitleStyle),
         ],
       ),
     );

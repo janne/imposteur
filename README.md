@@ -1,16 +1,26 @@
-# imposteur
+# Imposteur
 
-A new Flutter project.
+Local pass-the-phone party game built with Flutter. One player is the impostor
+and sees “Du är förrädaren” instead of the secret word. Everyone else sees the
+same word from the selected category.
 
-## Getting Started
+## Gameplay
 
-This project is a starting point for a Flutter application.
+1. Add players and pick a category in settings.
+2. Tap “Starta spel”.
+3. Each player holds the card to reveal their word, then taps “Nästa spelare”.
+4. After the last player, the app reveals who starts the round.
 
-A few resources to get you started if this is your first Flutter project:
+## Controls
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+- Hold the card to flip and reveal the word.
+- Release to flip back.
+- Use the back arrow to end a round and return to the home screen.
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+## Development
+
+- Install dependencies: `flutter pub get`
+- Run: `flutter run`
+- Lint: `flutter analyze`
+- Format: `dart format .`
+- Test: `flutter test`
