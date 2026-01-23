@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'app_theme.dart';
+
 class RevealScreen extends StatefulWidget {
   const RevealScreen({super.key});
 
@@ -215,18 +217,18 @@ class _RevealScreenState extends State<RevealScreen> {
   Widget _buildRevealCard(ThemeData theme) {
     final playerName = _players[_currentIndex];
     final isImpostor = _currentIndex == _impostorIndex;
-    final back = _cardFace(
-      theme,
+    final back = _CardFace(
+      theme: theme,
       title: isImpostor ? 'Du är förrädaren' : _word,
       subtitle: _category ?? 'Kategori',
       icon: isImpostor ? Icons.visibility_off_rounded : Icons.auto_awesome,
       emphasize: true,
-      backgroundColor: Colors.white,
-      backgroundGradient: null,
-      borderColor: null,
-      titleColor: const Color(0xFF0B1424),
-      subtitleColor: const Color(0xFF20324D),
-      iconColor: const Color(0xFF0B1424),
+      style: const _CardStyle(
+        backgroundColor: Colors.white,
+        titleColor: AppTheme.cardBackText,
+        subtitleColor: AppTheme.cardBackSubtitle,
+        iconColor: AppTheme.cardBackText,
+      ),
     );
 
     return AspectRatio(
@@ -234,13 +236,23 @@ class _RevealScreenState extends State<RevealScreen> {
       child: LayoutBuilder(
         builder: (context, constraints) {
           final borderWidth = constraints.maxWidth * 0.05;
-          final front = _cardFace(
-            theme,
+          final front = _CardFace(
+            theme: theme,
             title: playerName,
             subtitle: 'Spelare ${_currentIndex + 1}',
             icon: Icons.person_rounded,
-            borderColor: Colors.white.withValues(alpha: 0.9),
-            borderWidth: borderWidth,
+            style: _CardStyle(
+              borderColor: AppTheme.cardBorderColor,
+              borderWidth: borderWidth,
+              gradient: LinearGradient(
+                colors: [
+                  theme.colorScheme.surface,
+                  theme.colorScheme.surfaceContainerHighest,
+                ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+            ),
           );
 
           return _HoldToRevealCard(
@@ -285,28 +297,61 @@ class _RevealScreenState extends State<RevealScreen> {
       ),
     );
   }
+}
 
-  Widget _cardFace(
-    ThemeData theme, {
-    required String title,
-    required String subtitle,
-    required IconData icon,
-    bool emphasize = false,
-    Color? backgroundColor,
-    Gradient? backgroundGradient,
-    Color? borderColor,
-    double? borderWidth,
-    Color? titleColor,
-    Color? subtitleColor,
-    Color? iconColor,
-    List<BoxShadow>? boxShadow,
-  }) {
+class _CardStyle {
+  const _CardStyle({
+    this.backgroundColor,
+    this.gradient,
+    this.borderColor,
+    this.borderWidth = 1.2,
+    this.titleColor,
+    this.subtitleColor,
+    this.iconColor,
+  });
+
+  final Color? backgroundColor;
+  final Gradient? gradient;
+  final Color? borderColor;
+  final double borderWidth;
+  final Color? titleColor;
+  final Color? subtitleColor;
+  final Color? iconColor;
+}
+
+class _CardFace extends StatelessWidget {
+  const _CardFace({
+    required this.theme,
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+    required this.style,
+    this.emphasize = false,
+  });
+
+  final ThemeData theme;
+  final String title;
+  final String subtitle;
+  final IconData icon;
+  final _CardStyle style;
+  final bool emphasize;
+
+  static const List<BoxShadow> _defaultShadow = [
+    BoxShadow(
+      color: AppTheme.shadowColor,
+      blurRadius: 24,
+      offset: Offset(0, 12),
+    ),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
     final baseTitleStyle = emphasize
         ? theme.textTheme.headlineMedium
         : theme.textTheme.headlineSmall;
     final titleStyle = baseTitleStyle?.copyWith(
       fontWeight: FontWeight.w700,
-      color: titleColor,
+      color: style.titleColor,
     );
     final fallbackGradient = LinearGradient(
       colors: [
@@ -317,10 +362,10 @@ class _RevealScreenState extends State<RevealScreen> {
       end: Alignment.bottomRight,
     );
     final resolvedGradient =
-        backgroundGradient ??
-        (backgroundColor == null ? fallbackGradient : null);
+        style.gradient ??
+        (style.backgroundColor == null ? fallbackGradient : null);
     final subtitleStyle = theme.textTheme.titleMedium?.copyWith(
-      color: subtitleColor ?? theme.colorScheme.onSurfaceVariant,
+      color: style.subtitleColor ?? theme.colorScheme.onSurfaceVariant,
     );
 
     return Container(
@@ -328,26 +373,22 @@ class _RevealScreenState extends State<RevealScreen> {
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(28),
         color: resolvedGradient == null
-            ? (backgroundColor ?? theme.colorScheme.surface)
+            ? (style.backgroundColor ?? theme.colorScheme.surface)
             : null,
         gradient: resolvedGradient,
-        border: borderColor == null
+        border: style.borderColor == null
             ? null
-            : Border.all(color: borderColor, width: borderWidth ?? 1.2),
-        boxShadow:
-            boxShadow ??
-            [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.12),
-                blurRadius: 24,
-                offset: const Offset(0, 12),
-              ),
-            ],
+            : Border.all(color: style.borderColor!, width: style.borderWidth),
+        boxShadow: _defaultShadow,
       ),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(icon, size: 48, color: iconColor ?? theme.colorScheme.primary),
+          Icon(
+            icon,
+            size: 48,
+            color: style.iconColor ?? theme.colorScheme.primary,
+          ),
           const SizedBox(height: 16),
           Text(title, textAlign: TextAlign.center, style: titleStyle),
           const SizedBox(height: 8),
