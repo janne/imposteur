@@ -15,6 +15,8 @@ tooling land.
 Because no build system is committed yet, commands below are suggested
 defaults once a Flutter project exists. Verify before running.
 
+Always run the linter after code changes, then format the codebase.
+
 ### Bootstrap
 - Install dependencies: `flutter pub get`
 - Generate code (if used): `dart run build_runner build`

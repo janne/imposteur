@@ -122,90 +122,90 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return Scaffold(
       appBar: AppBar(title: const Text('Inställningar')),
       body: SafeArea(
-          child: _isLoading
-              ? const Center(child: CircularProgressIndicator())
-              : ListView(
-                  padding: const EdgeInsets.all(24),
-                  children: [
+        child: _isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : ListView(
+                padding: const EdgeInsets.all(24),
+                children: [
+                  Text(
+                    'Spelare',
+                    style: theme.textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  ReorderableListView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    padding: const EdgeInsets.only(top: 10, bottom: 10),
+                    buildDefaultDragHandles: false,
+                    itemCount: _controllers.length,
+                    onReorder: (oldIndex, newIndex) {
+                      setState(() {
+                        if (newIndex > oldIndex) {
+                          newIndex -= 1;
+                        }
+                        final controller = _controllers.removeAt(oldIndex);
+                        _controllers.insert(newIndex, controller);
+                      });
+                      _savePlayers();
+                    },
+                    itemBuilder: (context, index) {
+                      return _PlayerField(
+                        key: ValueKey(_controllers[index]),
+                        index: index,
+                        controller: _controllers[index],
+                        label: 'Spelare ${index + 1}',
+                        canRemove: _controllers.length > 2,
+                        onRemove: () => _removePlayer(index),
+                      );
+                    },
+                  ),
+                  const SizedBox(height: 8),
+                  OutlinedButton.icon(
+                    onPressed: _addPlayer,
+                    icon: const Icon(Icons.add),
+                    label: const Text('Lägg till spelare'),
+                  ),
+                  const SizedBox(height: 24),
+                  Text(
+                    'Kategorier',
+                    style: theme.textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Välj vilken kategori som ska kunna dyka upp.',
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  if (_categories.isEmpty)
                     Text(
-                      'Spelare',
-                      style: theme.textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.w600,
+                      'Inga kategorier hittades i ordlistan.',
+                      style: theme.textTheme.bodyMedium,
+                    )
+                  else
+                    DropdownButtonFormField<String>(
+                      initialValue: _selectedCategory,
+                      decoration: const InputDecoration(
+                        border: OutlineInputBorder(),
+                        labelText: 'Kategori',
                       ),
+                      items: _categories
+                          .map(
+                            (category) => DropdownMenuItem(
+                              value: category,
+                              child: Text(category),
+                            ),
+                          )
+                          .toList(),
+                      onChanged: _selectCategory,
                     ),
-                    const SizedBox(height: 12),
-                    ReorderableListView.builder(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      padding: const EdgeInsets.only(top: 10, bottom: 10),
-                      buildDefaultDragHandles: false,
-                      itemCount: _controllers.length,
-                      onReorder: (oldIndex, newIndex) {
-                        setState(() {
-                          if (newIndex > oldIndex) {
-                            newIndex -= 1;
-                          }
-                          final controller = _controllers.removeAt(oldIndex);
-                          _controllers.insert(newIndex, controller);
-                        });
-                        _savePlayers();
-                      },
-                      itemBuilder: (context, index) {
-                        return _PlayerField(
-                          key: ValueKey(_controllers[index]),
-                          index: index,
-                          controller: _controllers[index],
-                          label: 'Spelare ${index + 1}',
-                          canRemove: _controllers.length > 2,
-                          onRemove: () => _removePlayer(index),
-                        );
-                      },
-                    ),
-                    const SizedBox(height: 8),
-                    OutlinedButton.icon(
-                      onPressed: _addPlayer,
-                      icon: const Icon(Icons.add),
-                      label: const Text('Lägg till spelare'),
-                    ),
-                    const SizedBox(height: 24),
-                    Text(
-                      'Kategorier',
-                      style: theme.textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Välj vilken kategori som ska kunna dyka upp.',
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    if (_categories.isEmpty)
-                      Text(
-                        'Inga kategorier hittades i ordlistan.',
-                        style: theme.textTheme.bodyMedium,
-                      )
-                    else
-                      DropdownButtonFormField<String>(
-                        value: _selectedCategory,
-                        decoration: const InputDecoration(
-                          border: OutlineInputBorder(),
-                          labelText: 'Kategori',
-                        ),
-                        items: _categories
-                            .map(
-                              (category) => DropdownMenuItem(
-                                value: category,
-                                child: Text(category),
-                              ),
-                            )
-                            .toList(),
-                        onChanged: _selectCategory,
-                      ),
-                  ],
-                ),
+                ],
+              ),
       ),
     );
   }
