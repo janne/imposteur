@@ -1,4 +1,7 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -10,12 +13,14 @@ class SettingsScreen extends StatefulWidget {
 
 class _SettingsScreenState extends State<SettingsScreen> {
   final List<TextEditingController> _controllers = [];
+  final List<String> _categories = [];
+  String? _selectedCategory;
   bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
-    _loadPlayers();
+    _loadSettings();
   }
 
   @override
@@ -47,10 +52,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return controller;
   }
 
-  Future<void> _loadPlayers() async {
+  Future<void> _loadSettings() async {
     final prefs = await SharedPreferences.getInstance();
     final storedPlayers = prefs.getStringList('players');
     final players = storedPlayers ?? _defaultPlayers();
+    final categories = await _loadCategories();
+    final storedCategory = prefs.getString('category');
+    final selectedCategory = categories.contains(storedCategory)
+        ? storedCategory
+        : (categories.isNotEmpty ? categories.first : null);
 
     setState(() {
       for (final controller in _controllers) {
@@ -59,14 +69,46 @@ class _SettingsScreenState extends State<SettingsScreen> {
       _controllers
         ..clear()
         ..addAll(players.map(_createController));
+      _categories
+        ..clear()
+        ..addAll(categories);
+      _selectedCategory = selectedCategory;
       _isLoading = false;
     });
+  }
+
+  Future<List<String>> _loadCategories() async {
+    try {
+      final data = await rootBundle.loadString('assets/words/words.sv.json');
+      final decoded = jsonDecode(data);
+      if (decoded is Map<String, dynamic>) {
+        final categories = decoded.keys.toList()..sort();
+        return categories;
+      }
+    } catch (_) {}
+    return [];
   }
 
   Future<void> _savePlayers() async {
     final prefs = await SharedPreferences.getInstance();
     final players = _controllers.map((controller) => controller.text).toList();
     await prefs.setStringList('players', players);
+  }
+
+  Future<void> _saveCategory() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (_selectedCategory == null) {
+      await prefs.remove('category');
+    } else {
+      await prefs.setString('category', _selectedCategory!);
+    }
+  }
+
+  void _selectCategory(String? category) {
+    setState(() {
+      _selectedCategory = category;
+    });
+    _saveCategory();
   }
 
   List<String> _defaultPlayers() {
@@ -80,12 +122,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return Scaffold(
       appBar: AppBar(title: const Text('Inställningar')),
       body: SafeArea(
-        child: _isLoading
-            ? const Center(child: CircularProgressIndicator())
-            : Padding(
-                padding: const EdgeInsets.all(24),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
+          child: _isLoading
+              ? const Center(child: CircularProgressIndicator())
+              : ListView(
+                  padding: const EdgeInsets.all(24),
                   children: [
                     Text(
                       'Spelare',
@@ -94,32 +134,32 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       ),
                     ),
                     const SizedBox(height: 12),
-                    Expanded(
-                      child: ReorderableListView.builder(
-                        padding: EdgeInsets.only(top: 10, bottom: 10),
-                        buildDefaultDragHandles: false,
-                        itemCount: _controllers.length,
-                        onReorder: (oldIndex, newIndex) {
-                          setState(() {
-                            if (newIndex > oldIndex) {
-                              newIndex -= 1;
-                            }
-                            final controller = _controllers.removeAt(oldIndex);
-                            _controllers.insert(newIndex, controller);
-                          });
-                          _savePlayers();
-                        },
-                        itemBuilder: (context, index) {
-                          return _PlayerField(
-                            key: ValueKey(_controllers[index]),
-                            index: index,
-                            controller: _controllers[index],
-                            label: 'Spelare ${index + 1}',
-                            canRemove: _controllers.length > 2,
-                            onRemove: () => _removePlayer(index),
-                          );
-                        },
-                      ),
+                    ReorderableListView.builder(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      padding: const EdgeInsets.only(top: 10, bottom: 10),
+                      buildDefaultDragHandles: false,
+                      itemCount: _controllers.length,
+                      onReorder: (oldIndex, newIndex) {
+                        setState(() {
+                          if (newIndex > oldIndex) {
+                            newIndex -= 1;
+                          }
+                          final controller = _controllers.removeAt(oldIndex);
+                          _controllers.insert(newIndex, controller);
+                        });
+                        _savePlayers();
+                      },
+                      itemBuilder: (context, index) {
+                        return _PlayerField(
+                          key: ValueKey(_controllers[index]),
+                          index: index,
+                          controller: _controllers[index],
+                          label: 'Spelare ${index + 1}',
+                          canRemove: _controllers.length > 2,
+                          onRemove: () => _removePlayer(index),
+                        );
+                      },
                     ),
                     const SizedBox(height: 8),
                     OutlinedButton.icon(
@@ -127,9 +167,45 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       icon: const Icon(Icons.add),
                       label: const Text('Lägg till spelare'),
                     ),
+                    const SizedBox(height: 24),
+                    Text(
+                      'Kategorier',
+                      style: theme.textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Välj vilken kategori som ska kunna dyka upp.',
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    if (_categories.isEmpty)
+                      Text(
+                        'Inga kategorier hittades i ordlistan.',
+                        style: theme.textTheme.bodyMedium,
+                      )
+                    else
+                      DropdownButtonFormField<String>(
+                        value: _selectedCategory,
+                        decoration: const InputDecoration(
+                          border: OutlineInputBorder(),
+                          labelText: 'Kategori',
+                        ),
+                        items: _categories
+                            .map(
+                              (category) => DropdownMenuItem(
+                                value: category,
+                                child: Text(category),
+                              ),
+                            )
+                            .toList(),
+                        onChanged: _selectCategory,
+                      ),
                   ],
                 ),
-              ),
       ),
     );
   }
