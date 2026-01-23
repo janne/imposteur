@@ -2,7 +2,8 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+
+import '../data/settings_repository.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -12,6 +13,7 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
+  final SettingsRepository _settingsRepository = const SettingsRepository();
   final List<TextEditingController> _controllers = [];
   final List<String> _categories = [];
   String? _selectedCategory;
@@ -53,11 +55,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _loadSettings() async {
-    final prefs = await SharedPreferences.getInstance();
-    final storedPlayers = prefs.getStringList('players');
+    final storedPlayers = await _settingsRepository.loadPlayers();
     final players = storedPlayers ?? _defaultPlayers();
     final categories = await _loadCategories();
-    final storedCategory = prefs.getString('category');
+    final storedCategory = await _settingsRepository.loadCategory();
     final selectedCategory = categories.contains(storedCategory)
         ? storedCategory
         : (categories.isNotEmpty ? categories.first : null);
@@ -90,18 +91,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _savePlayers() async {
-    final prefs = await SharedPreferences.getInstance();
     final players = _controllers.map((controller) => controller.text).toList();
-    await prefs.setStringList('players', players);
+    await _settingsRepository.savePlayers(players);
   }
 
   Future<void> _saveCategory() async {
-    final prefs = await SharedPreferences.getInstance();
-    if (_selectedCategory == null) {
-      await prefs.remove('category');
-    } else {
-      await prefs.setString('category', _selectedCategory!);
-    }
+    await _settingsRepository.saveCategory(_selectedCategory);
   }
 
   void _selectCategory(String? category) {
