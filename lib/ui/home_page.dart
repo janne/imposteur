@@ -24,13 +24,13 @@ class _HomePageState extends State<HomePage>
     super.initState();
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 5200),
+      duration: AppAnimations.floatDuration,
     )..repeat(reverse: true);
-    _floatAnimation = Tween<double>(begin: -3, end: 3).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeInOutSine),
+    _floatAnimation = Tween<double>(begin: -4, end: 4).animate(
+      CurvedAnimation(parent: _controller, curve: AppAnimations.glowCurve),
     );
-    _glowAnimation = Tween<double>(begin: 0.6, end: 1).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeInOutSine),
+    _glowAnimation = Tween<double>(begin: 0.7, end: 1).animate(
+      CurvedAnimation(parent: _controller, curve: AppAnimations.glowCurve),
     );
   }
 
@@ -38,6 +38,27 @@ class _HomePageState extends State<HomePage>
   void dispose() {
     _controller.dispose();
     super.dispose();
+  }
+
+  Route<void> _buildRoute(Widget child) {
+    return PageRouteBuilder(
+      transitionDuration: AppAnimations.screenTransitionDuration,
+      reverseTransitionDuration: AppAnimations.screenTransitionDuration,
+      pageBuilder: (context, animation, secondaryAnimation) => child,
+      transitionsBuilder: (context, animation, secondaryAnimation, child) {
+        final curved = CurvedAnimation(
+          parent: animation,
+          curve: AppAnimations.revealCurve,
+        );
+        return FadeTransition(
+          opacity: curved,
+          child: ScaleTransition(
+            scale: Tween(begin: 0.98, end: 1.0).animate(curved),
+            child: child,
+          ),
+        );
+      },
+    );
   }
 
   @override
@@ -125,12 +146,9 @@ class _HomePageState extends State<HomePage>
                                     AppTheme.neonMint,
                                   ],
                                   onPressed: () {
-                                    Navigator.of(context).push(
-                                      MaterialPageRoute(
-                                        builder: (context) =>
-                                            const RevealScreen(),
-                                      ),
-                                    );
+                                    Navigator.of(
+                                      context,
+                                    ).push(_buildRoute(const RevealScreen()));
                                   },
                                 ),
                                 const SizedBox(height: 14),
@@ -144,12 +162,9 @@ class _HomePageState extends State<HomePage>
                                   backgroundColor: AppTheme.panelSurfaceDeep,
                                   textColor: theme.colorScheme.onSurface,
                                   onPressed: () {
-                                    Navigator.of(context).push(
-                                      MaterialPageRoute(
-                                        builder: (context) =>
-                                            const SettingsScreen(),
-                                      ),
-                                    );
+                                    Navigator.of(
+                                      context,
+                                    ).push(_buildRoute(const SettingsScreen()));
                                   },
                                 ),
                               ],
@@ -187,9 +202,9 @@ class _LogoGlow extends StatelessWidget {
           decoration: BoxDecoration(
             boxShadow: [
               BoxShadow(
-                color: AppTheme.neonCyan.withValues(alpha: 0.18 * glow.value),
-                blurRadius: 36,
-                offset: const Offset(0, 16),
+                color: AppTheme.neonCyan.withValues(alpha: 0.26 * glow.value),
+                blurRadius: 44,
+                offset: const Offset(0, 18),
               ),
             ],
           ),
@@ -205,7 +220,7 @@ class _LogoGlow extends StatelessWidget {
   }
 }
 
-class _NeonButton extends StatelessWidget {
+class _NeonButton extends StatefulWidget {
   const _NeonButton({
     required this.label,
     required this.glow,
@@ -223,52 +238,78 @@ class _NeonButton extends StatelessWidget {
   final Color? textColor;
 
   @override
+  State<_NeonButton> createState() => _NeonButtonState();
+}
+
+class _NeonButtonState extends State<_NeonButton> {
+  bool _isPressed = false;
+
+  void _handleHighlight(bool value) {
+    setState(() {
+      _isPressed = value;
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final borderRadius = BorderRadius.circular(22);
 
     return AnimatedBuilder(
-      animation: glow,
+      animation: widget.glow,
       builder: (context, child) {
-        final glowStrength = 0.18 + (0.12 * glow.value);
-        return Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: gradient,
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            borderRadius: borderRadius,
-            boxShadow: [
-              BoxShadow(
-                color: gradient.first.withValues(alpha: glowStrength),
-                blurRadius: 20 + (8 * glow.value),
-                spreadRadius: 1,
+        final glowStrength = 0.18 + (0.12 * widget.glow.value);
+        final pulseScale = 1 + (0.015 * widget.glow.value);
+        return AnimatedScale(
+          duration: AppAnimations.pressDuration,
+          scale: _isPressed ? 0.97 : 1,
+          child: Transform.scale(
+            scale: pulseScale,
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: widget.gradient,
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: borderRadius,
+                boxShadow: [
+                  BoxShadow(
+                    color: widget.gradient.first.withValues(
+                      alpha: glowStrength,
+                    ),
+                    blurRadius: 20 + (8 * widget.glow.value),
+                    spreadRadius: 1,
+                  ),
+                  BoxShadow(
+                    color: widget.gradient.last.withValues(
+                      alpha: glowStrength * 0.7,
+                    ),
+                    blurRadius: 28 + (10 * widget.glow.value),
+                    offset: const Offset(0, 12),
+                  ),
+                ],
               ),
-              BoxShadow(
-                color: gradient.last.withValues(alpha: glowStrength * 0.7),
-                blurRadius: 28 + (10 * glow.value),
-                offset: const Offset(0, 12),
-              ),
-            ],
-          ),
-          padding: const EdgeInsets.all(2),
-          child: Material(
-            color: backgroundColor ?? AppTheme.panelSurface,
-            borderRadius: borderRadius,
-            child: InkWell(
-              borderRadius: borderRadius,
-              onTap: onPressed,
-              child: Container(
-                height: 54,
-                alignment: Alignment.center,
-                padding: const EdgeInsets.symmetric(horizontal: 24),
-                child: Text(
-                  label,
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    color: textColor ?? theme.colorScheme.onSurface,
-                    fontWeight: FontWeight.w600,
-                    letterSpacing: 0.8,
+              padding: const EdgeInsets.all(2),
+              child: Material(
+                color: widget.backgroundColor ?? AppTheme.panelSurface,
+                borderRadius: borderRadius,
+                child: InkWell(
+                  borderRadius: borderRadius,
+                  onTap: widget.onPressed,
+                  onHighlightChanged: _handleHighlight,
+                  child: Container(
+                    height: 54,
+                    alignment: Alignment.center,
+                    padding: const EdgeInsets.symmetric(horizontal: 24),
+                    child: Text(
+                      widget.label,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        color: widget.textColor ?? theme.colorScheme.onSurface,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 0.8,
+                      ),
+                    ),
                   ),
                 ),
               ),

@@ -13,12 +13,15 @@ class SettingsScreen extends StatefulWidget {
   State<SettingsScreen> createState() => _SettingsScreenState();
 }
 
-class _SettingsScreenState extends State<SettingsScreen> {
+class _SettingsScreenState extends State<SettingsScreen>
+    with SingleTickerProviderStateMixin {
   final SettingsRepository _settingsRepository = const SettingsRepository();
   final List<_PlayerSlot> _players = [];
   final List<String> _categories = [];
   String? _selectedCategory;
   bool _isLoading = true;
+  late final AnimationController _glowController;
+  late final Animation<double> _glowAnimation;
   static const int _minPlayers = 3;
   static const int _maxPlayers = 12;
   static const List<String> _avatarAssets = [
@@ -39,11 +42,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
   @override
   void initState() {
     super.initState();
+    _glowController = AnimationController(
+      vsync: this,
+      duration: AppAnimations.glowPulseDuration,
+    )..repeat(reverse: true);
+    _glowAnimation = Tween<double>(begin: 0.6, end: 1).animate(
+      CurvedAnimation(parent: _glowController, curve: AppAnimations.glowCurve),
+    );
     _loadSettings();
   }
 
   @override
   void dispose() {
+    _glowController.dispose();
     for (final player in _players) {
       player.controller.dispose();
     }
@@ -306,6 +317,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                 Row(
                                   children: [
                                     _BackButtonPill(
+                                      glow: _glowAnimation,
                                       onPressed: () {
                                         Navigator.of(context).maybePop();
                                       },
@@ -337,6 +349,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                 ),
                                 const SizedBox(height: 12),
                                 _SettingsPanel(
+                                  glow: _glowAnimation,
                                   child: _categories.isEmpty
                                       ? Padding(
                                           padding: const EdgeInsets.symmetric(
@@ -401,6 +414,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                 ),
                                 const SizedBox(height: 12),
                                 _SettingsPanel(
+                                  glow: _glowAnimation,
                                   child: ReorderableListView.builder(
                                     shrinkWrap: true,
                                     physics:
@@ -442,6 +456,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                 _GlowButton(
                                   label: 'Lägg till spelare',
                                   icon: Icons.add,
+                                  glow: _glowAnimation,
                                   onPressed: _players.length >= _maxPlayers
                                       ? null
                                       : _addPlayer,
@@ -514,23 +529,42 @@ class _SectionHeader extends StatelessWidget {
 }
 
 class _SettingsPanel extends StatelessWidget {
-  const _SettingsPanel({required this.child});
+  const _SettingsPanel({required this.child, this.glow});
 
   final Widget child;
+  final Animation<double>? glow;
 
   @override
   Widget build(BuildContext context) {
+    if (glow == null) {
+      return _buildPanel(context, 1, child);
+    }
+    return AnimatedBuilder(
+      animation: glow!,
+      builder: (context, child) => _buildPanel(context, glow!.value, child!),
+      child: child,
+    );
+  }
+
+  Widget _buildPanel(BuildContext context, double glowValue, Widget child) {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: AppTheme.panelSurface.withValues(alpha: 0.9),
         borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: AppTheme.neonCyan.withValues(alpha: 0.08)),
+        border: Border.all(
+          color: AppTheme.neonCyan.withValues(alpha: 0.08 + (0.05 * glowValue)),
+        ),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.35),
             blurRadius: 20,
             offset: const Offset(0, 12),
+          ),
+          BoxShadow(
+            color: AppTheme.neonCyan.withValues(alpha: 0.08 * glowValue),
+            blurRadius: 24,
+            offset: const Offset(0, 10),
           ),
         ],
       ),
@@ -539,19 +573,37 @@ class _SettingsPanel extends StatelessWidget {
   }
 }
 
-class _BackButtonPill extends StatelessWidget {
-  const _BackButtonPill({required this.onPressed});
+class _BackButtonPill extends StatefulWidget {
+  const _BackButtonPill({required this.onPressed, this.glow});
 
   final VoidCallback onPressed;
+  final Animation<double>? glow;
+
+  @override
+  State<_BackButtonPill> createState() => _BackButtonPillState();
+}
+
+class _BackButtonPillState extends State<_BackButtonPill> {
+  bool _isPressed = false;
+
+  void _handleHighlight(bool value) {
+    setState(() {
+      _isPressed = value;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Material(
+    final borderRadius = BorderRadius.circular(18);
+    final glow = widget.glow;
+
+    Widget content = Material(
       color: AppTheme.panelSurface.withValues(alpha: 0.85),
-      borderRadius: BorderRadius.circular(18),
+      borderRadius: borderRadius,
       child: InkWell(
-        borderRadius: BorderRadius.circular(18),
-        onTap: onPressed,
+        borderRadius: borderRadius,
+        onTap: widget.onPressed,
+        onHighlightChanged: _handleHighlight,
         child: const Padding(
           padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           child: Row(
@@ -565,69 +617,138 @@ class _BackButtonPill extends StatelessWidget {
         ),
       ),
     );
+
+    if (glow != null) {
+      content = AnimatedBuilder(
+        animation: glow,
+        builder: (context, child) {
+          return DecoratedBox(
+            decoration: BoxDecoration(
+              borderRadius: borderRadius,
+              boxShadow: [
+                BoxShadow(
+                  color: AppTheme.neonCyan.withValues(alpha: 0.08 * glow.value),
+                  blurRadius: 12,
+                  offset: const Offset(0, 6),
+                ),
+              ],
+            ),
+            child: child,
+          );
+        },
+        child: content,
+      );
+    }
+
+    return AnimatedScale(
+      duration: AppAnimations.pressDuration,
+      scale: _isPressed ? 0.96 : 1,
+      child: content,
+    );
   }
 }
 
-class _GlowButton extends StatelessWidget {
-  const _GlowButton({required this.label, required this.icon, this.onPressed});
+class _GlowButton extends StatefulWidget {
+  const _GlowButton({
+    required this.label,
+    required this.icon,
+    this.onPressed,
+    this.glow,
+  });
 
   final String label;
   final IconData icon;
   final VoidCallback? onPressed;
+  final Animation<double>? glow;
+
+  @override
+  State<_GlowButton> createState() => _GlowButtonState();
+}
+
+class _GlowButtonState extends State<_GlowButton> {
+  bool _isPressed = false;
+
+  void _handleHighlight(bool value) {
+    setState(() {
+      _isPressed = value;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isEnabled = onPressed != null;
+    final isEnabled = widget.onPressed != null;
     final borderRadius = BorderRadius.circular(18);
+    final animation = widget.glow ?? const AlwaysStoppedAnimation<double>(1);
 
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 250),
-      decoration: BoxDecoration(
-        gradient: isEnabled
-            ? const LinearGradient(
-                colors: [AppTheme.neonCyan, AppTheme.neonMint],
-                begin: Alignment.centerLeft,
-                end: Alignment.centerRight,
-              )
-            : null,
-        borderRadius: borderRadius,
-        boxShadow: isEnabled
-            ? [
-                BoxShadow(
-                  color: AppTheme.neonCyan.withValues(alpha: 0.25),
-                  blurRadius: 18,
-                  offset: const Offset(0, 10),
-                ),
-              ]
-            : null,
-      ),
-      padding: const EdgeInsets.all(2),
-      child: Material(
-        color: isEnabled ? AppTheme.panelSurfaceDeep : AppTheme.panelSurface,
-        borderRadius: borderRadius,
-        child: InkWell(
-          borderRadius: borderRadius,
-          onTap: onPressed,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(icon, size: 20),
-                const SizedBox(width: 8),
-                Text(
-                  label,
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
-                    letterSpacing: 0.4,
+    return AnimatedBuilder(
+      animation: animation,
+      builder: (context, child) {
+        final glowValue = isEnabled ? animation.value : 0;
+        final pulseScale = isEnabled ? (1.0 + (0.012 * glowValue)) : 1.0;
+        return AnimatedScale(
+          duration: AppAnimations.pressDuration,
+          scale: _isPressed ? 0.97 : 1,
+          child: Transform.scale(
+            scale: pulseScale,
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: isEnabled
+                    ? const LinearGradient(
+                        colors: [AppTheme.neonCyan, AppTheme.neonMint],
+                        begin: Alignment.centerLeft,
+                        end: Alignment.centerRight,
+                      )
+                    : null,
+                borderRadius: borderRadius,
+                boxShadow: isEnabled
+                    ? [
+                        BoxShadow(
+                          color: AppTheme.neonCyan.withValues(
+                            alpha: 0.18 + (0.12 * glowValue),
+                          ),
+                          blurRadius: 18.0 + (6.0 * glowValue),
+                          offset: const Offset(0, 10),
+                        ),
+                      ]
+                    : null,
+              ),
+              padding: const EdgeInsets.all(2),
+              child: Material(
+                color: isEnabled
+                    ? AppTheme.panelSurfaceDeep
+                    : AppTheme.panelSurface,
+                borderRadius: borderRadius,
+                child: InkWell(
+                  borderRadius: borderRadius,
+                  onTap: widget.onPressed,
+                  onHighlightChanged: _handleHighlight,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 18,
+                      vertical: 14,
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(widget.icon, size: 20),
+                        const SizedBox(width: 8),
+                        Text(
+                          widget.label,
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w600,
+                            letterSpacing: 0.4,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-              ],
+              ),
             ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 }

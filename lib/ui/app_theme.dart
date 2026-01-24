@@ -43,3 +43,14 @@ class AppTheme {
     ),
   );
 }
+
+class AppAnimations {
+  static const Duration glowPulseDuration = Duration(milliseconds: 2800);
+  static const Duration floatDuration = Duration(milliseconds: 3600);
+  static const Duration pressDuration = Duration(milliseconds: 140);
+  static const Duration revealFlashDuration = Duration(milliseconds: 220);
+  static const Duration screenTransitionDuration = Duration(milliseconds: 260);
+
+  static const Curve glowCurve = Curves.easeInOutSine;
+  static const Curve revealCurve = Curves.easeOut;
+}

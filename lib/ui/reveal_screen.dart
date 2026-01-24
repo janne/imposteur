@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:math';
+import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -13,7 +14,8 @@ class RevealScreen extends StatefulWidget {
   State<RevealScreen> createState() => _RevealScreenState();
 }
 
-class _RevealScreenState extends State<RevealScreen> {
+class _RevealScreenState extends State<RevealScreen>
+    with SingleTickerProviderStateMixin {
   final Random _random = Random();
   final SettingsRepository _settingsRepository = const SettingsRepository();
   final Map<String, List<String>> _wordMap = {};
@@ -42,10 +44,29 @@ class _RevealScreenState extends State<RevealScreen> {
   int _roundId = 0;
   bool _showStartingPlayer = false;
   bool _isLoading = true;
+  late final AnimationController _ambientController;
+  late final Animation<double> _ambientGlow;
+  late final Animation<double> _ambientFloat;
 
   @override
   void initState() {
     super.initState();
+    _ambientController = AnimationController(
+      vsync: this,
+      duration: AppAnimations.floatDuration,
+    )..repeat(reverse: true);
+    _ambientGlow = Tween<double>(begin: 0.6, end: 1).animate(
+      CurvedAnimation(
+        parent: _ambientController,
+        curve: AppAnimations.glowCurve,
+      ),
+    );
+    _ambientFloat = Tween<double>(begin: -2, end: 2).animate(
+      CurvedAnimation(
+        parent: _ambientController,
+        curve: AppAnimations.glowCurve,
+      ),
+    );
     _loadGame();
   }
 
@@ -228,6 +249,12 @@ class _RevealScreenState extends State<RevealScreen> {
   }
 
   @override
+  void dispose() {
+    _ambientController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
@@ -333,6 +360,7 @@ class _RevealScreenState extends State<RevealScreen> {
                                   ? _startNewRound
                                   : _nextPlayer,
                               isPrimary: !_showStartingPlayer,
+                              glow: _ambientGlow,
                             ),
                             SizedBox(height: constraints.maxHeight * 0.02),
                           ],
@@ -343,6 +371,19 @@ class _RevealScreenState extends State<RevealScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildAnimatedCard(Widget child) {
+    return AnimatedBuilder(
+      animation: _ambientController,
+      builder: (context, child) {
+        return Transform.translate(
+          offset: Offset(0, _ambientFloat.value),
+          child: child,
+        );
+      },
+      child: child,
     );
   }
 
@@ -357,34 +398,41 @@ class _RevealScreenState extends State<RevealScreen> {
       accentColor: accentColor,
       icon: isImpostor ? Icons.visibility_off_rounded : Icons.auto_awesome,
       emphasize: true,
+      glow: _ambientGlow,
     );
 
-    return AspectRatio(
-      aspectRatio: 2.6 / 3.6,
-      child: _HoldToRevealCard(
-        key: ValueKey('reveal-$_roundId-$_currentIndex'),
-        front: _RevealCardFace(
-          title: playerName,
-          subtitle: 'Spelare ${_currentIndex + 1}',
-          helper: 'Håll inne för att avslöja.',
-          accentColor: AppTheme.neonCyan,
-          avatarAsset: _avatarForPlayer(_currentIndex),
+    return _buildAnimatedCard(
+      AspectRatio(
+        aspectRatio: 2.6 / 3.6,
+        child: _HoldToRevealCard(
+          key: ValueKey('reveal-$_roundId-$_currentIndex'),
+          front: _RevealCardFace(
+            title: playerName,
+            subtitle: 'Spelare ${_currentIndex + 1}',
+            helper: 'Håll inne för att avslöja.',
+            accentColor: AppTheme.neonCyan,
+            avatarAsset: _avatarForPlayer(_currentIndex),
+            glow: _ambientGlow,
+          ),
+          back: back,
         ),
-        back: back,
       ),
     );
   }
 
   Widget _buildStartingPlayer(ThemeData theme) {
     final playerName = _players[_startingPlayerIndex].name;
-    return _RevealCardFace(
-      title: playerName,
-      subtitle: 'börjar spelet',
-      helper: 'Starta diskussionen när alla sett sitt ord.',
-      accentColor: AppTheme.neonMint,
-      avatarAsset: _avatarForPlayer(_startingPlayerIndex),
-      icon: Icons.play_circle_fill_rounded,
-      emphasize: true,
+    return _buildAnimatedCard(
+      _RevealCardFace(
+        title: playerName,
+        subtitle: 'börjar spelet',
+        helper: 'Starta diskussionen när alla sett sitt ord.',
+        accentColor: AppTheme.neonMint,
+        avatarAsset: _avatarForPlayer(_startingPlayerIndex),
+        icon: Icons.play_circle_fill_rounded,
+        emphasize: true,
+        glow: _ambientGlow,
+      ),
     );
   }
 }
@@ -398,6 +446,7 @@ class _RevealCardFace extends StatelessWidget {
     this.icon,
     this.avatarAsset,
     this.emphasize = false,
+    this.glow,
   });
 
   final String title;
@@ -407,6 +456,7 @@ class _RevealCardFace extends StatelessWidget {
   final Color accentColor;
   final String? avatarAsset;
   final bool emphasize;
+  final Animation<double>? glow;
 
   @override
   Widget build(BuildContext context) {
@@ -425,85 +475,118 @@ class _RevealCardFace extends StatelessWidget {
       color: theme.colorScheme.onSurfaceVariant,
       height: 1.4,
     );
+    final animation = glow ?? const AlwaysStoppedAnimation<double>(1);
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 24),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(30),
-        gradient: LinearGradient(
-          colors: [AppTheme.panelSurface, AppTheme.panelSurfaceDeep],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        border: Border.all(color: accentColor.withValues(alpha: 0.7), width: 2),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.45),
-            blurRadius: 30,
-            offset: const Offset(0, 16),
-          ),
-          BoxShadow(
-            color: accentColor.withValues(alpha: 0.25),
-            blurRadius: 28,
-            offset: const Offset(0, 10),
-          ),
-        ],
-      ),
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final avatarSize = constraints.maxWidth * 0.55;
-          return Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              if (icon != null)
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: accentColor.withValues(alpha: 0.15),
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: accentColor.withValues(alpha: 0.6),
-                      width: 1.2,
-                    ),
-                  ),
-                  child: Icon(icon, color: accentColor, size: 28),
-                ),
-              if (icon != null) const SizedBox(height: 16),
-              if (avatarAsset != null)
-                Container(
-                  height: avatarSize,
-                  width: avatarSize,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(28),
-                    border: Border.all(
-                      color: accentColor.withValues(alpha: 0.6),
-                      width: 1.4,
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: accentColor.withValues(alpha: 0.35),
-                        blurRadius: 18,
-                        offset: const Offset(0, 10),
-                      ),
-                    ],
-                  ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(26),
-                    child: Image.asset(avatarAsset!, fit: BoxFit.cover),
-                  ),
-                ),
-              if (avatarAsset != null) const SizedBox(height: 20),
-              Text(title, textAlign: TextAlign.center, style: titleStyle),
-              const SizedBox(height: 8),
-              Text(subtitle, textAlign: TextAlign.center, style: subtitleStyle),
-              if (helper != null) ...[
-                const SizedBox(height: 12),
-                Text(helper!, textAlign: TextAlign.center, style: helperStyle),
-              ],
+    return AnimatedBuilder(
+      animation: animation,
+      builder: (context, child) {
+        final glowValue = animation.value;
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 24),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(30),
+            gradient: LinearGradient(
+              colors: [AppTheme.panelSurface, AppTheme.panelSurfaceDeep],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            border: Border.all(
+              color: accentColor.withValues(alpha: 0.55 + (0.25 * glowValue)),
+              width: 2,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.45),
+                blurRadius: 30,
+                offset: const Offset(0, 16),
+              ),
+              BoxShadow(
+                color: accentColor.withValues(alpha: 0.18 + (0.2 * glowValue)),
+                blurRadius: 28.0 + (8.0 * glowValue),
+                offset: const Offset(0, 10),
+              ),
             ],
-          );
-        },
-      ),
+          ),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final avatarSize = constraints.maxWidth * 0.55;
+              return Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  if (icon != null)
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: accentColor.withValues(alpha: 0.15),
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: accentColor.withValues(
+                            alpha: 0.5 + (0.2 * glowValue),
+                          ),
+                          width: 1.2,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: accentColor.withValues(
+                              alpha: 0.15 + (0.12 * glowValue),
+                            ),
+                            blurRadius: 14.0 + (6.0 * glowValue),
+                            offset: const Offset(0, 6),
+                          ),
+                        ],
+                      ),
+                      child: Icon(icon, color: accentColor, size: 28),
+                    ),
+                  if (icon != null) const SizedBox(height: 16),
+                  if (avatarAsset != null)
+                    Container(
+                      height: avatarSize,
+                      width: avatarSize,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(28),
+                        border: Border.all(
+                          color: accentColor.withValues(
+                            alpha: 0.5 + (0.2 * glowValue),
+                          ),
+                          width: 1.4,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: accentColor.withValues(
+                              alpha: 0.28 + (0.18 * glowValue),
+                            ),
+                            blurRadius: 18.0 + (8.0 * glowValue),
+                            offset: const Offset(0, 10),
+                          ),
+                        ],
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(26),
+                        child: Image.asset(avatarAsset!, fit: BoxFit.cover),
+                      ),
+                    ),
+                  if (avatarAsset != null) const SizedBox(height: 20),
+                  Text(title, textAlign: TextAlign.center, style: titleStyle),
+                  const SizedBox(height: 8),
+                  Text(
+                    subtitle,
+                    textAlign: TextAlign.center,
+                    style: subtitleStyle,
+                  ),
+                  if (helper != null) ...[
+                    const SizedBox(height: 12),
+                    Text(
+                      helper!,
+                      textAlign: TextAlign.center,
+                      style: helperStyle,
+                    ),
+                  ],
+                ],
+              );
+            },
+          ),
+        );
+      },
     );
   }
 }
@@ -542,28 +625,48 @@ class _HintPanel extends StatelessWidget {
   }
 }
 
-class _BackButtonPill extends StatelessWidget {
+class _BackButtonPill extends StatefulWidget {
   const _BackButtonPill({required this.onPressed});
 
   final VoidCallback onPressed;
 
   @override
+  State<_BackButtonPill> createState() => _BackButtonPillState();
+}
+
+class _BackButtonPillState extends State<_BackButtonPill> {
+  bool _isPressed = false;
+
+  void _handleHighlight(bool value) {
+    setState(() {
+      _isPressed = value;
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return Material(
-      color: AppTheme.panelSurface.withValues(alpha: 0.85),
-      borderRadius: BorderRadius.circular(18),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(18),
-        onTap: onPressed,
-        child: const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.arrow_back, size: 18),
-              SizedBox(width: 6),
-              Text('Tillbaka'),
-            ],
+    final borderRadius = BorderRadius.circular(18);
+
+    return AnimatedScale(
+      duration: AppAnimations.pressDuration,
+      scale: _isPressed ? 0.96 : 1,
+      child: Material(
+        color: AppTheme.panelSurface.withValues(alpha: 0.85),
+        borderRadius: borderRadius,
+        child: InkWell(
+          borderRadius: borderRadius,
+          onTap: widget.onPressed,
+          onHighlightChanged: _handleHighlight,
+          child: const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.arrow_back, size: 18),
+                SizedBox(width: 6),
+                Text('Tillbaka'),
+              ],
+            ),
           ),
         ),
       ),
@@ -605,63 +708,96 @@ class _StatusPill extends StatelessWidget {
   }
 }
 
-class _ActionButton extends StatelessWidget {
+class _ActionButton extends StatefulWidget {
   const _ActionButton({
     required this.label,
     required this.onPressed,
     this.isPrimary = true,
+    this.glow,
   });
 
   final String label;
   final VoidCallback onPressed;
   final bool isPrimary;
+  final Animation<double>? glow;
+
+  @override
+  State<_ActionButton> createState() => _ActionButtonState();
+}
+
+class _ActionButtonState extends State<_ActionButton> {
+  bool _isPressed = false;
+
+  void _handleHighlight(bool value) {
+    setState(() {
+      _isPressed = value;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final borderRadius = BorderRadius.circular(20);
-    final gradient = isPrimary
+    final gradient = widget.isPrimary
         ? const [AppTheme.neonCyan, AppTheme.neonMint]
         : const [AppTheme.neonOrange, AppTheme.neonRed];
+    final animation = widget.glow ?? const AlwaysStoppedAnimation<double>(1);
 
-    return Container(
-      width: double.infinity,
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: gradient,
-          begin: Alignment.centerLeft,
-          end: Alignment.centerRight,
-        ),
-        borderRadius: borderRadius,
-        boxShadow: [
-          BoxShadow(
-            color: gradient.first.withValues(alpha: 0.25),
-            blurRadius: 22,
-            offset: const Offset(0, 12),
-          ),
-        ],
-      ),
-      padding: const EdgeInsets.all(2),
-      child: Material(
-        color: AppTheme.panelSurfaceDeep,
-        borderRadius: borderRadius,
-        child: InkWell(
-          borderRadius: borderRadius,
-          onTap: onPressed,
-          child: Container(
-            height: 54,
-            alignment: Alignment.center,
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: Text(
-              label,
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w700,
-                letterSpacing: 0.6,
+    return AnimatedBuilder(
+      animation: animation,
+      builder: (context, child) {
+        final glowValue = widget.isPrimary ? animation.value : 0.6;
+        final pulseScale = widget.isPrimary ? (1.0 + (0.015 * glowValue)) : 1.0;
+        return AnimatedScale(
+          duration: AppAnimations.pressDuration,
+          scale: _isPressed ? 0.97 : 1,
+          child: Transform.scale(
+            scale: pulseScale,
+            child: Container(
+              width: double.infinity,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: gradient,
+                  begin: Alignment.centerLeft,
+                  end: Alignment.centerRight,
+                ),
+                borderRadius: borderRadius,
+                boxShadow: [
+                  BoxShadow(
+                    color: gradient.first.withValues(
+                      alpha: 0.2 + (0.1 * glowValue),
+                    ),
+                    blurRadius: 22.0 + (6.0 * glowValue),
+                    offset: const Offset(0, 12),
+                  ),
+                ],
+              ),
+              padding: const EdgeInsets.all(2),
+              child: Material(
+                color: AppTheme.panelSurfaceDeep,
+                borderRadius: borderRadius,
+                child: InkWell(
+                  borderRadius: borderRadius,
+                  onTap: widget.onPressed,
+                  onHighlightChanged: _handleHighlight,
+                  child: Container(
+                    height: 54,
+                    alignment: Alignment.center,
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: Text(
+                      widget.label,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.6,
+                      ),
+                    ),
+                  ),
+                ),
               ),
             ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 }
@@ -720,6 +856,11 @@ class _HoldToRevealCardState extends State<_HoldToRevealCard>
           final transform = Matrix4.identity()
             ..setEntry(3, 2, 0.001)
             ..rotateY(angle);
+          final revealProgress = Curves.easeOut.transform(
+            ((_animation.value - 0.5) / 0.5).clamp(0.0, 1.0),
+          );
+          final flashOpacity = (1 - revealProgress) * 0.25;
+
           return Transform(
             alignment: Alignment.center,
             transform: transform,
@@ -728,7 +869,32 @@ class _HoldToRevealCardState extends State<_HoldToRevealCard>
                 : Transform(
                     alignment: Alignment.center,
                     transform: Matrix4.rotationY(pi),
-                    child: widget.back,
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        Opacity(
+                          opacity: revealProgress,
+                          child: ImageFiltered(
+                            imageFilter: ImageFilter.blur(
+                              sigmaX: (1 - revealProgress) * 6,
+                              sigmaY: (1 - revealProgress) * 6,
+                            ),
+                            child: widget.back,
+                          ),
+                        ),
+                        IgnorePointer(
+                          child: Opacity(
+                            opacity: flashOpacity,
+                            child: DecoratedBox(
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.6),
+                                borderRadius: BorderRadius.circular(30),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
           );
         },
