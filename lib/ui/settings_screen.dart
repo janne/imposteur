@@ -82,9 +82,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final players = _normalizePlayers(storedPlayers ?? _defaultPlayers());
     final categories = await _loadCategories();
     final storedCategory = await _settingsRepository.loadCategory();
-    final selectedCategory = categories.contains(storedCategory)
-        ? storedCategory
-        : (categories.isNotEmpty ? categories.first : null);
+    final selectedCategory = categories.contains(storedCategory) ? storedCategory : (categories.isNotEmpty ? categories.first : null);
 
     setState(() {
       for (final controller in _controllers) {
@@ -144,11 +142,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (limited.length >= _minPlayers) {
       return limited;
     }
-    return List.generate(
-      _minPlayers,
-      (index) =>
-          index < limited.length ? limited[index] : 'Spelare ${index + 1}',
-    );
+    return List.generate(_minPlayers, (index) => index < limited.length ? limited[index] : 'Spelare ${index + 1}');
   }
 
   String _avatarForIndex(int index) {
@@ -162,18 +156,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return Scaffold(
       body: Stack(
         children: [
-          Positioned.fill(
-            child: Image.asset('assets/images/bg.png', fit: BoxFit.cover),
-          ),
+          Positioned.fill(child: Image.asset('assets/images/bg.png', fit: BoxFit.cover)),
           Positioned.fill(
             child: DecoratedBox(
               decoration: BoxDecoration(
                 gradient: LinearGradient(
-                  colors: [
-                    Colors.black.withValues(alpha: 0.72),
-                    Colors.black.withValues(alpha: 0.35),
-                    Colors.transparent,
-                  ],
+                  colors: [Colors.black.withValues(alpha: 0.72), Colors.black.withValues(alpha: 0.35), Colors.transparent],
                   begin: Alignment.bottomCenter,
                   end: Alignment.topCenter,
                 ),
@@ -186,10 +174,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 gradient: RadialGradient(
                   center: Alignment.topCenter,
                   radius: 1.2,
-                  colors: [
-                    AppTheme.neonCyan.withValues(alpha: 0.14),
-                    Colors.transparent,
-                  ],
+                  colors: [AppTheme.neonCyan.withValues(alpha: 0.14), Colors.transparent],
                 ),
               ),
             ),
@@ -200,10 +185,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 : LayoutBuilder(
                     builder: (context, constraints) {
                       return SingleChildScrollView(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 24,
-                          vertical: 20,
-                        ),
+                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
                         child: Align(
                           alignment: Alignment.topCenter,
                           child: ConstrainedBox(
@@ -223,100 +205,54 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                 const SizedBox(height: 12),
                                 Text(
                                   'Inställningar',
-                                  style: theme.textTheme.headlineSmall
-                                      ?.copyWith(
-                                        fontWeight: FontWeight.w700,
-                                        letterSpacing: 0.8,
-                                      ),
+                                  style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700, letterSpacing: 0.8),
                                 ),
                                 const SizedBox(height: 6),
                                 Text(
                                   'Ställ in spelare och välj ordkategori innan ni drar igång.',
-                                  style: theme.textTheme.bodyMedium?.copyWith(
-                                    color: theme.colorScheme.onSurfaceVariant,
-                                    height: 1.4,
-                                  ),
+                                  style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant, height: 1.4),
                                 ),
                                 const SizedBox(height: 24),
-                                const _SectionHeader(
-                                  title: 'Kategorier',
-                                  subtitle:
-                                      'Välj en kategori som ska användas i spelet.',
-                                ),
+                                const _SectionHeader(title: 'Kategorier', subtitle: 'Välj en kategori som ska användas i spelet.'),
                                 const SizedBox(height: 12),
                                 _SettingsPanel(
                                   child: _categories.isEmpty
                                       ? Padding(
-                                          padding: const EdgeInsets.symmetric(
-                                            vertical: 8,
-                                          ),
-                                          child: Text(
-                                            'Inga kategorier hittades i ordlistan.',
-                                            style: theme.textTheme.bodyMedium,
-                                          ),
+                                          padding: const EdgeInsets.symmetric(vertical: 8),
+                                          child: Text('Inga kategorier hittades i ordlistan.', style: theme.textTheme.bodyMedium),
                                         )
                                       : DropdownButtonFormField<String>(
                                           initialValue: _selectedCategory,
                                           decoration: InputDecoration(
                                             filled: true,
-                                            fillColor:
-                                                AppTheme.panelSurfaceDeep,
+                                            fillColor: AppTheme.panelSurfaceDeep,
                                             border: OutlineInputBorder(
-                                              borderRadius:
-                                                  BorderRadius.circular(16),
-                                              borderSide: BorderSide(
-                                                color: theme
-                                                    .colorScheme
-                                                    .outlineVariant,
-                                              ),
+                                              borderRadius: BorderRadius.circular(16),
+                                              borderSide: BorderSide(color: theme.colorScheme.outlineVariant),
                                             ),
                                             enabledBorder: OutlineInputBorder(
-                                              borderRadius:
-                                                  BorderRadius.circular(16),
-                                              borderSide: BorderSide(
-                                                color: theme
-                                                    .colorScheme
-                                                    .outlineVariant,
-                                              ),
+                                              borderRadius: BorderRadius.circular(16),
+                                              borderSide: BorderSide(color: theme.colorScheme.outlineVariant),
                                             ),
                                             focusedBorder: OutlineInputBorder(
-                                              borderRadius:
-                                                  BorderRadius.circular(16),
-                                              borderSide: const BorderSide(
-                                                color: AppTheme.neonCyan,
-                                                width: 1.4,
-                                              ),
+                                              borderRadius: BorderRadius.circular(16),
+                                              borderSide: const BorderSide(color: AppTheme.neonCyan, width: 1.4),
                                             ),
                                             labelText: 'Kategori',
                                           ),
                                           dropdownColor: AppTheme.panelSurface,
-                                          items: _categories
-                                              .map(
-                                                (category) => DropdownMenuItem(
-                                                  value: category,
-                                                  child: Text(category),
-                                                ),
-                                              )
-                                              .toList(),
+                                          items: _categories.map((category) => DropdownMenuItem(value: category, child: Text(category))).toList(),
                                           onChanged: _selectCategory,
                                         ),
                                 ),
                                 const SizedBox(height: 28),
-                                _SectionHeader(
-                                  title: 'Spelare',
-                                  subtitle:
-                                      '${_controllers.length} av $_maxPlayers · Min $_minPlayers spelare',
-                                ),
+                                _SectionHeader(title: 'Spelare', subtitle: '${_controllers.length} av $_maxPlayers · Min $_minPlayers spelare'),
                                 const SizedBox(height: 12),
                                 _SettingsPanel(
                                   child: ReorderableListView.builder(
                                     shrinkWrap: true,
-                                    physics:
-                                        const NeverScrollableScrollPhysics(),
-                                    padding: const EdgeInsets.only(
-                                      top: 6,
-                                      bottom: 6,
-                                    ),
+                                    physics: const NeverScrollableScrollPhysics(),
+                                    padding: const EdgeInsets.only(top: 6, bottom: 6),
                                     buildDefaultDragHandles: false,
                                     itemCount: _controllers.length,
                                     onReorder: (oldIndex, newIndex) {
@@ -324,12 +260,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                         if (newIndex > oldIndex) {
                                           newIndex -= 1;
                                         }
-                                        final controller = _controllers
-                                            .removeAt(oldIndex);
-                                        _controllers.insert(
-                                          newIndex,
-                                          controller,
-                                        );
+                                        final controller = _controllers.removeAt(oldIndex);
+                                        _controllers.insert(newIndex, controller);
                                       });
                                       _savePlayers();
                                     },
@@ -340,8 +272,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                         controller: _controllers[index],
                                         label: 'Spelare ${index + 1}',
                                         avatarAsset: _avatarForIndex(index),
-                                        canRemove:
-                                            _controllers.length > _minPlayers,
+                                        canRemove: _controllers.length > _minPlayers,
                                         onRemove: () => _removePlayer(index),
                                       );
                                     },
@@ -351,21 +282,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                 _GlowButton(
                                   label: 'Lägg till spelare',
                                   icon: Icons.add,
-                                  onPressed: _controllers.length >= _maxPlayers
-                                      ? null
-                                      : _addPlayer,
+                                  onPressed: _controllers.length >= _maxPlayers ? null : _addPlayer,
                                 ),
                                 if (_controllers.length >= _maxPlayers)
                                   Padding(
                                     padding: const EdgeInsets.only(top: 10),
                                     child: Text(
                                       'Max $_maxPlayers spelare. Ta bort någon för att lägga till fler.',
-                                      style: theme.textTheme.bodySmall
-                                          ?.copyWith(
-                                            color: theme
-                                                .colorScheme
-                                                .onSurfaceVariant,
-                                          ),
+                                      style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
                                     ),
                                   ),
                                 SizedBox(height: constraints.maxHeight * 0.08),
@@ -396,20 +320,9 @@ class _SectionHeader extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          title,
-          style: theme.textTheme.titleLarge?.copyWith(
-            fontWeight: FontWeight.w600,
-            letterSpacing: 0.4,
-          ),
-        ),
+        Text(title, style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600, letterSpacing: 0.4)),
         const SizedBox(height: 4),
-        Text(
-          subtitle,
-          style: theme.textTheme.bodySmall?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
-          ),
-        ),
+        Text(subtitle, style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
       ],
     );
   }
@@ -428,13 +341,7 @@ class _SettingsPanel extends StatelessWidget {
         color: AppTheme.panelSurface.withValues(alpha: 0.9),
         borderRadius: BorderRadius.circular(22),
         border: Border.all(color: AppTheme.neonCyan.withValues(alpha: 0.08)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.35),
-            blurRadius: 20,
-            offset: const Offset(0, 12),
-          ),
-        ],
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.35), blurRadius: 20, offset: const Offset(0, 12))],
       ),
       child: child,
     );
@@ -456,14 +363,7 @@ class _BackButtonPill extends StatelessWidget {
         onTap: onPressed,
         child: const Padding(
           padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.arrow_back, size: 18),
-              SizedBox(width: 6),
-              Text('Tillbaka'),
-            ],
-          ),
+          child: Row(mainAxisSize: MainAxisSize.min, children: [Icon(Icons.arrow_back, size: 18), SizedBox(width: 6), Text('Tillbaka')]),
         ),
       ),
     );
@@ -487,22 +387,10 @@ class _GlowButton extends StatelessWidget {
       duration: const Duration(milliseconds: 250),
       decoration: BoxDecoration(
         gradient: isEnabled
-            ? const LinearGradient(
-                colors: [AppTheme.neonCyan, AppTheme.neonMint],
-                begin: Alignment.centerLeft,
-                end: Alignment.centerRight,
-              )
+            ? const LinearGradient(colors: [AppTheme.neonCyan, AppTheme.neonMint], begin: Alignment.centerLeft, end: Alignment.centerRight)
             : null,
         borderRadius: borderRadius,
-        boxShadow: isEnabled
-            ? [
-                BoxShadow(
-                  color: AppTheme.neonCyan.withValues(alpha: 0.25),
-                  blurRadius: 18,
-                  offset: const Offset(0, 10),
-                ),
-              ]
-            : null,
+        boxShadow: isEnabled ? [BoxShadow(color: AppTheme.neonCyan.withValues(alpha: 0.25), blurRadius: 18, offset: const Offset(0, 10))] : null,
       ),
       padding: const EdgeInsets.all(2),
       child: Material(
@@ -518,13 +406,7 @@ class _GlowButton extends StatelessWidget {
               children: [
                 Icon(icon, size: 20),
                 const SizedBox(width: 8),
-                Text(
-                  label,
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
-                    letterSpacing: 0.4,
-                  ),
-                ),
+                Text(label, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600, letterSpacing: 0.4)),
               ],
             ),
           ),
@@ -563,9 +445,7 @@ class _PlayerField extends StatelessWidget {
         decoration: BoxDecoration(
           color: AppTheme.panelSurfaceDeep,
           borderRadius: BorderRadius.circular(18),
-          border: Border.all(
-            color: theme.colorScheme.outlineVariant.withValues(alpha: 0.6),
-          ),
+          border: Border.all(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.6)),
         ),
         child: Row(
           children: [
@@ -573,27 +453,22 @@ class _PlayerField extends StatelessWidget {
               message: 'Dra för att ändra ordning',
               child: ReorderableDragStartListener(
                 index: index,
-                child: MouseRegion(
-                  cursor: SystemMouseCursors.grab,
-                  child: Container(
-                    height: 48,
-                    width: 48,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(
-                        color: AppTheme.neonCyan.withValues(alpha: 0.2),
+                child: ReorderableDelayedDragStartListener(
+                  index: index,
+                  child: MouseRegion(
+                    cursor: SystemMouseCursors.grab,
+                    child: Container(
+                      height: 48,
+                      width: 48,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: AppTheme.neonCyan.withValues(alpha: 0.2)),
+                        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.35), blurRadius: 10, offset: const Offset(0, 6))],
                       ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.35),
-                          blurRadius: 10,
-                          offset: const Offset(0, 6),
-                        ),
-                      ],
-                    ),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(14),
-                      child: Image.asset(avatarAsset, fit: BoxFit.cover),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(14),
+                        child: Image.asset(avatarAsset, fit: BoxFit.cover),
+                      ),
                     ),
                   ),
                 ),
@@ -603,15 +478,10 @@ class _PlayerField extends StatelessWidget {
             Expanded(
               child: TextField(
                 controller: controller,
-                style: theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
+                style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
                 decoration: InputDecoration(
                   hintText: label,
-                  hintStyle: theme.textTheme.titleMedium?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                    fontWeight: FontWeight.w500,
-                  ),
+                  hintStyle: theme.textTheme.titleMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant, fontWeight: FontWeight.w500),
                   border: InputBorder.none,
                   isDense: true,
                 ),
@@ -620,12 +490,7 @@ class _PlayerField extends StatelessWidget {
             IconButton(
               tooltip: 'Ta bort spelare',
               onPressed: canRemove ? onRemove : null,
-              icon: Icon(
-                Icons.close,
-                color: canRemove
-                    ? theme.colorScheme.onSurface
-                    : theme.colorScheme.onSurfaceVariant,
-              ),
+              icon: Icon(Icons.close, color: canRemove ? theme.colorScheme.onSurface : theme.colorScheme.onSurfaceVariant),
             ),
           ],
         ),
