@@ -15,7 +15,7 @@ class SettingsScreen extends StatefulWidget {
 
 class _SettingsScreenState extends State<SettingsScreen> {
   final SettingsRepository _settingsRepository = const SettingsRepository();
-  final List<TextEditingController> _controllers = [];
+  final List<_PlayerSlot> _players = [];
   final List<String> _categories = [];
   String? _selectedCategory;
   bool _isLoading = true;
@@ -44,59 +44,81 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   @override
   void dispose() {
-    for (final controller in _controllers) {
-      controller.dispose();
+    for (final player in _players) {
+      player.controller.dispose();
     }
     super.dispose();
   }
 
   void _addPlayer() {
-    if (_controllers.length >= _maxPlayers) {
+    if (_players.length >= _maxPlayers) {
       return;
     }
     setState(() {
-      _controllers.add(_createController('Spelare ${_controllers.length + 1}'));
+      _players.add(
+        _createPlayerSlot(
+          'Spelare ${_players.length + 1}',
+          _nextAvailableAvatar(),
+        ),
+      );
     });
     _savePlayers();
   }
 
   void _removePlayer(int index) {
-    if (_controllers.length <= _minPlayers) {
+    if (_players.length <= _minPlayers) {
       return;
     }
     setState(() {
-      _controllers[index].dispose();
-      _controllers.removeAt(index);
+      _players[index].controller.dispose();
+      _players.removeAt(index);
     });
     _savePlayers();
   }
 
-  TextEditingController _createController(String name) {
+  _PlayerSlot _createPlayerSlot(String name, String avatarAsset) {
     final controller = TextEditingController(text: name);
     controller.addListener(_savePlayers);
-    return controller;
+    return _PlayerSlot(controller: controller, avatarAsset: avatarAsset);
   }
 
   Future<void> _loadSettings() async {
-    final storedPlayers = await _settingsRepository.loadPlayers();
-    final players = _normalizePlayers(storedPlayers ?? _defaultPlayers());
+    final storedEntries = await _settingsRepository.loadPlayerEntries();
+    final storedPlayers = storedEntries == null
+        ? await _settingsRepository.loadPlayers()
+        : null;
+    final players = _normalizePlayerEntries(storedEntries, storedPlayers);
     final categories = await _loadCategories();
     final storedCategory = await _settingsRepository.loadCategory();
-    final selectedCategory = categories.contains(storedCategory) ? storedCategory : (categories.isNotEmpty ? categories.first : null);
+    final selectedCategory = categories.contains(storedCategory)
+        ? storedCategory
+        : (categories.isNotEmpty ? categories.first : null);
+
+    if (!mounted) {
+      return;
+    }
 
     setState(() {
-      for (final controller in _controllers) {
-        controller.dispose();
+      for (final player in _players) {
+        player.controller.dispose();
       }
-      _controllers
+      _players
         ..clear()
-        ..addAll(players.map(_createController));
+        ..addAll(
+          players.map(
+            (entry) => _createPlayerSlot(entry.name, entry.avatarAsset),
+          ),
+        );
       _categories
         ..clear()
         ..addAll(categories);
       _selectedCategory = selectedCategory;
       _isLoading = false;
     });
+
+    if (storedEntries == null) {
+      await _settingsRepository.savePlayerEntries(players);
+    }
   }
 
   Future<List<String>> _loadCategories() async {
@@ -112,8 +134,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _savePlayers() async {
-    final players = _controllers.map((controller) => controller.text).toList();
-    await _settingsRepository.savePlayers(players);
+    final entries = <PlayerEntry>[];
+    for (var index = 0; index < _players.length; index++) {
+      final name = _players[index].controller.text.trim();
+      entries.add(
+        PlayerEntry(
+          name: name.isEmpty ? 'Spelare ${index + 1}' : name,
+          avatarAsset: _players[index].avatarAsset,
+        ),
+      );
+    }
+    await _settingsRepository.savePlayerEntries(entries);
   }
 
   Future<void> _saveCategory() async {
@@ -142,11 +173,78 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (limited.length >= _minPlayers) {
       return limited;
     }
-    return List.generate(_minPlayers, (index) => index < limited.length ? limited[index] : 'Spelare ${index + 1}');
+    return List.generate(
+      _minPlayers,
+      (index) =>
+          index < limited.length ? limited[index] : 'Spelare ${index + 1}',
+    );
   }
 
-  String _avatarForIndex(int index) {
-    return _avatarAssets[index % _avatarAssets.length];
+  List<PlayerEntry> _normalizePlayerEntries(
+    List<PlayerEntry>? storedEntries,
+    List<String>? legacyPlayers,
+  ) {
+    if (storedEntries != null && storedEntries.isNotEmpty) {
+      return _normalizeEntryList(storedEntries);
+    }
+    final names = _normalizePlayers(legacyPlayers ?? _defaultPlayers());
+    return _entriesFromNames(names);
+  }
+
+  List<PlayerEntry> _normalizeEntryList(List<PlayerEntry> entries) {
+    final normalized = <PlayerEntry>[];
+    final used = <String>{};
+    for (
+      var index = 0;
+      index < entries.length && normalized.length < _maxPlayers;
+      index++
+    ) {
+      final entry = entries[index];
+      final name = entry.name.trim();
+      var avatarAsset = entry.avatarAsset.trim();
+      if (avatarAsset.isEmpty || used.contains(avatarAsset)) {
+        avatarAsset = _nextAvailableAvatar(used);
+      }
+      used.add(avatarAsset);
+      normalized.add(
+        PlayerEntry(
+          name: name.isEmpty ? 'Spelare ${index + 1}' : name,
+          avatarAsset: avatarAsset,
+        ),
+      );
+    }
+    if (normalized.length < _minPlayers) {
+      for (var index = normalized.length; index < _minPlayers; index++) {
+        final avatar = _nextAvailableAvatar(used);
+        used.add(avatar);
+        normalized.add(
+          PlayerEntry(name: 'Spelare ${index + 1}', avatarAsset: avatar),
+        );
+      }
+    }
+    return normalized;
+  }
+
+  List<PlayerEntry> _entriesFromNames(List<String> names) {
+    final entries = <PlayerEntry>[];
+    final used = <String>{};
+    for (var index = 0; index < names.length; index++) {
+      final avatar = _nextAvailableAvatar(used);
+      used.add(avatar);
+      entries.add(PlayerEntry(name: names[index], avatarAsset: avatar));
+    }
+    return entries;
+  }
+
+  String _nextAvailableAvatar([Set<String>? used]) {
+    final usedAvatars =
+        used ?? _players.map((player) => player.avatarAsset).toSet();
+    for (final asset in _avatarAssets) {
+      if (!usedAvatars.contains(asset)) {
+        return asset;
+      }
+    }
+    return _avatarAssets[usedAvatars.length % _avatarAssets.length];
   }
 
   @override
@@ -156,12 +254,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return Scaffold(
       body: Stack(
         children: [
-          Positioned.fill(child: Image.asset('assets/images/bg.png', fit: BoxFit.cover)),
+          Positioned.fill(
+            child: Image.asset('assets/images/bg.png', fit: BoxFit.cover),
+          ),
           Positioned.fill(
             child: DecoratedBox(
               decoration: BoxDecoration(
                 gradient: LinearGradient(
-                  colors: [Colors.black.withValues(alpha: 0.72), Colors.black.withValues(alpha: 0.35), Colors.transparent],
+                  colors: [
+                    Colors.black.withValues(alpha: 0.72),
+                    Colors.black.withValues(alpha: 0.35),
+                    Colors.transparent,
+                  ],
                   begin: Alignment.bottomCenter,
                   end: Alignment.topCenter,
                 ),
@@ -174,7 +278,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 gradient: RadialGradient(
                   center: Alignment.topCenter,
                   radius: 1.2,
-                  colors: [AppTheme.neonCyan.withValues(alpha: 0.14), Colors.transparent],
+                  colors: [
+                    AppTheme.neonCyan.withValues(alpha: 0.14),
+                    Colors.transparent,
+                  ],
                 ),
               ),
             ),
@@ -185,7 +292,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 : LayoutBuilder(
                     builder: (context, constraints) {
                       return SingleChildScrollView(
-                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 24,
+                          vertical: 20,
+                        ),
                         child: Align(
                           alignment: Alignment.topCenter,
                           child: ConstrainedBox(
@@ -205,74 +315,124 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                 const SizedBox(height: 12),
                                 Text(
                                   'Inställningar',
-                                  style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700, letterSpacing: 0.8),
+                                  style: theme.textTheme.headlineSmall
+                                      ?.copyWith(
+                                        fontWeight: FontWeight.w700,
+                                        letterSpacing: 0.8,
+                                      ),
                                 ),
                                 const SizedBox(height: 6),
                                 Text(
                                   'Ställ in spelare och välj ordkategori innan ni drar igång.',
-                                  style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant, height: 1.4),
+                                  style: theme.textTheme.bodyMedium?.copyWith(
+                                    color: theme.colorScheme.onSurfaceVariant,
+                                    height: 1.4,
+                                  ),
                                 ),
                                 const SizedBox(height: 24),
-                                const _SectionHeader(title: 'Kategorier', subtitle: 'Välj en kategori som ska användas i spelet.'),
+                                const _SectionHeader(
+                                  title: 'Kategorier',
+                                  subtitle:
+                                      'Välj en kategori som ska användas i spelet.',
+                                ),
                                 const SizedBox(height: 12),
                                 _SettingsPanel(
                                   child: _categories.isEmpty
                                       ? Padding(
-                                          padding: const EdgeInsets.symmetric(vertical: 8),
-                                          child: Text('Inga kategorier hittades i ordlistan.', style: theme.textTheme.bodyMedium),
+                                          padding: const EdgeInsets.symmetric(
+                                            vertical: 8,
+                                          ),
+                                          child: Text(
+                                            'Inga kategorier hittades i ordlistan.',
+                                            style: theme.textTheme.bodyMedium,
+                                          ),
                                         )
                                       : DropdownButtonFormField<String>(
                                           initialValue: _selectedCategory,
                                           decoration: InputDecoration(
                                             filled: true,
-                                            fillColor: AppTheme.panelSurfaceDeep,
+                                            fillColor:
+                                                AppTheme.panelSurfaceDeep,
                                             border: OutlineInputBorder(
-                                              borderRadius: BorderRadius.circular(16),
-                                              borderSide: BorderSide(color: theme.colorScheme.outlineVariant),
+                                              borderRadius:
+                                                  BorderRadius.circular(16),
+                                              borderSide: BorderSide(
+                                                color: theme
+                                                    .colorScheme
+                                                    .outlineVariant,
+                                              ),
                                             ),
                                             enabledBorder: OutlineInputBorder(
-                                              borderRadius: BorderRadius.circular(16),
-                                              borderSide: BorderSide(color: theme.colorScheme.outlineVariant),
+                                              borderRadius:
+                                                  BorderRadius.circular(16),
+                                              borderSide: BorderSide(
+                                                color: theme
+                                                    .colorScheme
+                                                    .outlineVariant,
+                                              ),
                                             ),
                                             focusedBorder: OutlineInputBorder(
-                                              borderRadius: BorderRadius.circular(16),
-                                              borderSide: const BorderSide(color: AppTheme.neonCyan, width: 1.4),
+                                              borderRadius:
+                                                  BorderRadius.circular(16),
+                                              borderSide: const BorderSide(
+                                                color: AppTheme.neonCyan,
+                                                width: 1.4,
+                                              ),
                                             ),
                                             labelText: 'Kategori',
                                           ),
                                           dropdownColor: AppTheme.panelSurface,
-                                          items: _categories.map((category) => DropdownMenuItem(value: category, child: Text(category))).toList(),
+                                          items: _categories
+                                              .map(
+                                                (category) => DropdownMenuItem(
+                                                  value: category,
+                                                  child: Text(category),
+                                                ),
+                                              )
+                                              .toList(),
                                           onChanged: _selectCategory,
                                         ),
                                 ),
                                 const SizedBox(height: 28),
-                                _SectionHeader(title: 'Spelare', subtitle: '${_controllers.length} av $_maxPlayers · Min $_minPlayers spelare'),
+                                _SectionHeader(
+                                  title: 'Spelare',
+                                  subtitle:
+                                      '${_players.length} av $_maxPlayers · Min $_minPlayers spelare',
+                                ),
                                 const SizedBox(height: 12),
                                 _SettingsPanel(
                                   child: ReorderableListView.builder(
                                     shrinkWrap: true,
-                                    physics: const NeverScrollableScrollPhysics(),
-                                    padding: const EdgeInsets.only(top: 6, bottom: 6),
+                                    physics:
+                                        const NeverScrollableScrollPhysics(),
+                                    padding: const EdgeInsets.only(
+                                      top: 6,
+                                      bottom: 6,
+                                    ),
                                     buildDefaultDragHandles: false,
-                                    itemCount: _controllers.length,
+                                    itemCount: _players.length,
                                     onReorder: (oldIndex, newIndex) {
                                       setState(() {
                                         if (newIndex > oldIndex) {
                                           newIndex -= 1;
                                         }
-                                        final controller = _controllers.removeAt(oldIndex);
-                                        _controllers.insert(newIndex, controller);
+                                        final player = _players.removeAt(
+                                          oldIndex,
+                                        );
+                                        _players.insert(newIndex, player);
                                       });
                                       _savePlayers();
                                     },
                                     itemBuilder: (context, index) {
+                                      final player = _players[index];
                                       return _PlayerField(
-                                        key: ValueKey(_controllers[index]),
+                                        key: ValueKey(player.controller),
                                         index: index,
-                                        controller: _controllers[index],
+                                        controller: player.controller,
                                         label: 'Spelare ${index + 1}',
-                                        avatarAsset: _avatarForIndex(index),
-                                        canRemove: _controllers.length > _minPlayers,
+                                        avatarAsset: player.avatarAsset,
+                                        canRemove:
+                                            _players.length > _minPlayers,
                                         onRemove: () => _removePlayer(index),
                                       );
                                     },
@@ -282,14 +442,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                 _GlowButton(
                                   label: 'Lägg till spelare',
                                   icon: Icons.add,
-                                  onPressed: _controllers.length >= _maxPlayers ? null : _addPlayer,
+                                  onPressed: _players.length >= _maxPlayers
+                                      ? null
+                                      : _addPlayer,
                                 ),
-                                if (_controllers.length >= _maxPlayers)
+                                if (_players.length >= _maxPlayers)
                                   Padding(
                                     padding: const EdgeInsets.only(top: 10),
                                     child: Text(
                                       'Max $_maxPlayers spelare. Ta bort någon för att lägga till fler.',
-                                      style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                                      style: theme.textTheme.bodySmall
+                                          ?.copyWith(
+                                            color: theme
+                                                .colorScheme
+                                                .onSurfaceVariant,
+                                          ),
                                     ),
                                   ),
                                 SizedBox(height: constraints.maxHeight * 0.08),
@@ -307,6 +474,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 }
 
+class _PlayerSlot {
+  _PlayerSlot({required this.controller, required this.avatarAsset});
+
+  final TextEditingController controller;
+  final String avatarAsset;
+}
+
 class _SectionHeader extends StatelessWidget {
   const _SectionHeader({required this.title, required this.subtitle});
 
@@ -320,9 +494,20 @@ class _SectionHeader extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(title, style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600, letterSpacing: 0.4)),
+        Text(
+          title,
+          style: theme.textTheme.titleLarge?.copyWith(
+            fontWeight: FontWeight.w600,
+            letterSpacing: 0.4,
+          ),
+        ),
         const SizedBox(height: 4),
-        Text(subtitle, style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+        Text(
+          subtitle,
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+        ),
       ],
     );
   }
@@ -341,7 +526,13 @@ class _SettingsPanel extends StatelessWidget {
         color: AppTheme.panelSurface.withValues(alpha: 0.9),
         borderRadius: BorderRadius.circular(22),
         border: Border.all(color: AppTheme.neonCyan.withValues(alpha: 0.08)),
-        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.35), blurRadius: 20, offset: const Offset(0, 12))],
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.35),
+            blurRadius: 20,
+            offset: const Offset(0, 12),
+          ),
+        ],
       ),
       child: child,
     );
@@ -363,7 +554,14 @@ class _BackButtonPill extends StatelessWidget {
         onTap: onPressed,
         child: const Padding(
           padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          child: Row(mainAxisSize: MainAxisSize.min, children: [Icon(Icons.arrow_back, size: 18), SizedBox(width: 6), Text('Tillbaka')]),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.arrow_back, size: 18),
+              SizedBox(width: 6),
+              Text('Tillbaka'),
+            ],
+          ),
         ),
       ),
     );
@@ -387,10 +585,22 @@ class _GlowButton extends StatelessWidget {
       duration: const Duration(milliseconds: 250),
       decoration: BoxDecoration(
         gradient: isEnabled
-            ? const LinearGradient(colors: [AppTheme.neonCyan, AppTheme.neonMint], begin: Alignment.centerLeft, end: Alignment.centerRight)
+            ? const LinearGradient(
+                colors: [AppTheme.neonCyan, AppTheme.neonMint],
+                begin: Alignment.centerLeft,
+                end: Alignment.centerRight,
+              )
             : null,
         borderRadius: borderRadius,
-        boxShadow: isEnabled ? [BoxShadow(color: AppTheme.neonCyan.withValues(alpha: 0.25), blurRadius: 18, offset: const Offset(0, 10))] : null,
+        boxShadow: isEnabled
+            ? [
+                BoxShadow(
+                  color: AppTheme.neonCyan.withValues(alpha: 0.25),
+                  blurRadius: 18,
+                  offset: const Offset(0, 10),
+                ),
+              ]
+            : null,
       ),
       padding: const EdgeInsets.all(2),
       child: Material(
@@ -406,7 +616,13 @@ class _GlowButton extends StatelessWidget {
               children: [
                 Icon(icon, size: 20),
                 const SizedBox(width: 8),
-                Text(label, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600, letterSpacing: 0.4)),
+                Text(
+                  label,
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 0.4,
+                  ),
+                ),
               ],
             ),
           ),
@@ -445,7 +661,9 @@ class _PlayerField extends StatelessWidget {
         decoration: BoxDecoration(
           color: AppTheme.panelSurfaceDeep,
           borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.6)),
+          border: Border.all(
+            color: theme.colorScheme.outlineVariant.withValues(alpha: 0.6),
+          ),
         ),
         child: Row(
           children: [
@@ -462,8 +680,16 @@ class _PlayerField extends StatelessWidget {
                       width: 48,
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: AppTheme.neonCyan.withValues(alpha: 0.2)),
-                        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.35), blurRadius: 10, offset: const Offset(0, 6))],
+                        border: Border.all(
+                          color: AppTheme.neonCyan.withValues(alpha: 0.2),
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.35),
+                            blurRadius: 10,
+                            offset: const Offset(0, 6),
+                          ),
+                        ],
                       ),
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(14),
@@ -478,10 +704,15 @@ class _PlayerField extends StatelessWidget {
             Expanded(
               child: TextField(
                 controller: controller,
-                style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
                 decoration: InputDecoration(
                   hintText: label,
-                  hintStyle: theme.textTheme.titleMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant, fontWeight: FontWeight.w500),
+                  hintStyle: theme.textTheme.titleMedium?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                    fontWeight: FontWeight.w500,
+                  ),
                   border: InputBorder.none,
                   isDense: true,
                 ),
@@ -490,7 +721,12 @@ class _PlayerField extends StatelessWidget {
             IconButton(
               tooltip: 'Ta bort spelare',
               onPressed: canRemove ? onRemove : null,
-              icon: Icon(Icons.close, color: canRemove ? theme.colorScheme.onSurface : theme.colorScheme.onSurfaceVariant),
+              icon: Icon(
+                Icons.close,
+                color: canRemove
+                    ? theme.colorScheme.onSurface
+                    : theme.colorScheme.onSurfaceVariant,
+              ),
             ),
           ],
         ),

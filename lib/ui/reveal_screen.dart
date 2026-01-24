@@ -3,8 +3,7 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-
+import '../data/settings_repository.dart';
 import 'app_theme.dart';
 
 class RevealScreen extends StatefulWidget {
@@ -16,8 +15,9 @@ class RevealScreen extends StatefulWidget {
 
 class _RevealScreenState extends State<RevealScreen> {
   final Random _random = Random();
+  final SettingsRepository _settingsRepository = const SettingsRepository();
   final Map<String, List<String>> _wordMap = {};
-  final List<String> _players = [];
+  final List<PlayerEntry> _players = [];
   static const int _minPlayers = 3;
   static const int _maxPlayers = 12;
   static const List<String> _avatarAssets = [
@@ -50,10 +50,12 @@ class _RevealScreenState extends State<RevealScreen> {
   }
 
   Future<void> _loadGame() async {
-    final prefs = await SharedPreferences.getInstance();
-    final storedPlayers = prefs.getStringList('players');
-    final players = _normalizePlayers(storedPlayers ?? _defaultPlayers());
-    final storedCategory = prefs.getString('category');
+    final storedEntries = await _settingsRepository.loadPlayerEntries();
+    final storedPlayers = storedEntries == null
+        ? await _settingsRepository.loadPlayers()
+        : null;
+    final players = _normalizePlayerEntries(storedEntries, storedPlayers);
+    final storedCategory = await _settingsRepository.loadCategory();
     final words = await _loadWords();
     final categories = words.keys.toList()..sort();
     final category = categories.contains(storedCategory)
@@ -74,6 +76,10 @@ class _RevealScreenState extends State<RevealScreen> {
       _category = category;
       _isLoading = false;
     });
+
+    if (storedEntries == null) {
+      await _settingsRepository.savePlayerEntries(players);
+    }
 
     _startNewRound();
   }
@@ -118,8 +124,75 @@ class _RevealScreenState extends State<RevealScreen> {
     return List.generate(4, (index) => 'Spelare ${index + 1}');
   }
 
-  String _avatarForIndex(int index) {
-    return _avatarAssets[index % _avatarAssets.length];
+  List<PlayerEntry> _normalizePlayerEntries(
+    List<PlayerEntry>? storedEntries,
+    List<String>? legacyPlayers,
+  ) {
+    if (storedEntries != null && storedEntries.isNotEmpty) {
+      return _normalizeEntryList(storedEntries);
+    }
+    final names = _normalizePlayers(legacyPlayers ?? _defaultPlayers());
+    return _entriesFromNames(names);
+  }
+
+  List<PlayerEntry> _normalizeEntryList(List<PlayerEntry> entries) {
+    final normalized = <PlayerEntry>[];
+    final used = <String>{};
+    for (
+      var index = 0;
+      index < entries.length && normalized.length < _maxPlayers;
+      index++
+    ) {
+      final entry = entries[index];
+      final name = entry.name.trim();
+      var avatarAsset = entry.avatarAsset.trim();
+      if (avatarAsset.isEmpty || used.contains(avatarAsset)) {
+        avatarAsset = _nextAvailableAvatar(used);
+      }
+      used.add(avatarAsset);
+      normalized.add(
+        PlayerEntry(
+          name: name.isEmpty ? 'Spelare ${index + 1}' : name,
+          avatarAsset: avatarAsset,
+        ),
+      );
+    }
+    if (normalized.length < _minPlayers) {
+      for (var index = normalized.length; index < _minPlayers; index++) {
+        final avatar = _nextAvailableAvatar(used);
+        used.add(avatar);
+        normalized.add(
+          PlayerEntry(name: 'Spelare ${index + 1}', avatarAsset: avatar),
+        );
+      }
+    }
+    return normalized;
+  }
+
+  List<PlayerEntry> _entriesFromNames(List<String> names) {
+    final entries = <PlayerEntry>[];
+    final used = <String>{};
+    for (var index = 0; index < names.length; index++) {
+      final avatar = _nextAvailableAvatar(used);
+      used.add(avatar);
+      entries.add(PlayerEntry(name: names[index], avatarAsset: avatar));
+    }
+    return entries;
+  }
+
+  String _nextAvailableAvatar([Set<String>? used]) {
+    final usedAvatars =
+        used ?? _players.map((player) => player.avatarAsset).toSet();
+    for (final asset in _avatarAssets) {
+      if (!usedAvatars.contains(asset)) {
+        return asset;
+      }
+    }
+    return _avatarAssets[usedAvatars.length % _avatarAssets.length];
+  }
+
+  String _avatarForPlayer(int index) {
+    return _players[index].avatarAsset;
   }
 
   void _startNewRound() {
@@ -274,7 +347,7 @@ class _RevealScreenState extends State<RevealScreen> {
   }
 
   Widget _buildRevealCard(ThemeData theme) {
-    final playerName = _players[_currentIndex];
+    final playerName = _players[_currentIndex].name;
     final isImpostor = _currentIndex == _impostorIndex;
     final accentColor = isImpostor ? AppTheme.neonRed : AppTheme.neonMint;
     final back = _RevealCardFace(
@@ -295,7 +368,7 @@ class _RevealScreenState extends State<RevealScreen> {
           subtitle: 'Spelare ${_currentIndex + 1}',
           helper: 'Håll inne för att avslöja.',
           accentColor: AppTheme.neonCyan,
-          avatarAsset: _avatarForIndex(_currentIndex),
+          avatarAsset: _avatarForPlayer(_currentIndex),
         ),
         back: back,
       ),
@@ -303,13 +376,13 @@ class _RevealScreenState extends State<RevealScreen> {
   }
 
   Widget _buildStartingPlayer(ThemeData theme) {
-    final playerName = _players[_startingPlayerIndex];
+    final playerName = _players[_startingPlayerIndex].name;
     return _RevealCardFace(
       title: playerName,
       subtitle: 'börjar spelet',
       helper: 'Starta diskussionen när alla sett sitt ord.',
       accentColor: AppTheme.neonMint,
-      avatarAsset: _avatarForIndex(_startingPlayerIndex),
+      avatarAsset: _avatarForPlayer(_startingPlayerIndex),
       icon: Icons.play_circle_fill_rounded,
       emphasize: true,
     );
